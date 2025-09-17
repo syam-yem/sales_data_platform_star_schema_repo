@@ -1,0 +1,4 @@
+variables:
+  catalog_name:
+    description: This is the param varaiables for the catalog name
+    default: databricksete

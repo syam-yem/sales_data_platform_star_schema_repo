@@ -1,0 +1,77 @@
+resources:
+  jobs:
+    End_to_end_pipeline:
+      name: End_to_end_pipeline
+      tasks:
+        - task_key: Parameter_task
+          notebook_task:
+            notebook_path: ../../src/Notebooks/file_parameters
+            source: WORKSPACE
+        - task_key: loading_to_landing
+          depends_on:
+            - task_key: Parameter_task
+          for_each_task:
+            inputs: "{{tasks.Parameter_task.values.output_datasets}}"
+            task:
+              task_key: loading_to_landing_iteration
+              notebook_task:
+                notebook_path: ../../src/Notebooks/orders_bronze
+                base_parameters:
+                  file_name: "{{input.file_name}}"
+                source: WORKSPACE
+        - task_key: silver_customer_task
+          depends_on:
+            - task_key: loading_to_landing
+          notebook_task:
+            notebook_path: ../../src/Notebooks/silver_customers
+            source: WORKSPACE
+        - task_key: silver_order_task
+          depends_on:
+            - task_key: loading_to_landing
+          notebook_task:
+            notebook_path: ../../src/Notebooks/silver_orders
+            source: WORKSPACE
+        - task_key: silver_product_task
+          depends_on:
+            - task_key: loading_to_landing
+          notebook_task:
+            notebook_path: ../../src/Notebooks/silver_products
+            source: WORKSPACE
+        - task_key: Gold_customers_task
+          depends_on:
+            - task_key: silver_order_task
+            - task_key: silver_product_task
+            - task_key: silver_customer_task
+          notebook_task:
+            notebook_path: ../../src/Notebooks/gold_customers
+            source: WORKSPACE
+        - task_key: Gold_products_task
+          depends_on:
+            - task_key: silver_customer_task
+            - task_key: silver_order_task
+            - task_key: silver_product_task
+          pipeline_task:
+            pipeline_id: 61d20500-f842-4edb-b6d8-cf80700d6acc
+            full_refresh: false
+        - task_key: Gold_fact_order_task
+          depends_on:
+            - task_key: Gold_customers_task
+            - task_key: Gold_products_task
+          notebook_task:
+            notebook_path: ../../src/Notebooks/gold_fact_orders
+            source: WORKSPACE
+      job_clusters:
+        - job_cluster_key: Parameter_task_cluster
+          new_cluster:
+            cluster_name: ""
+            spark_version: 16.4.x-scala2.12
+            node_type_id: Standard_D4s_v3
+            spark_env_vars:
+              PYSPARK_PYTHON: /databricks/python3/bin/python3
+            data_security_mode: DATA_SECURITY_MODE_DEDICATED
+            runtime_engine: STANDARD
+            kind: CLASSIC_PREVIEW
+            is_single_node: true
+      queue:
+        enabled: true
+      performance_target: PERFORMANCE_OPTIMIZED
